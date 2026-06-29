@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-x64
+            os: ubuntu-latest
+            arch: x64
+          - name: macos-arm64
+            os: macos-latest
+            arch: arm64
+          - name: windows-x64
+            os: windows-latest
+            arch: x64
+          - name: windows-x86
+            os: windows-latest
+            arch: x86
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Provide the interpreter; `architecture` selects 32-bit vs 64-bit on
+      # Windows so we exercise both x86 and x64 ABIs of the extension.
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          architecture: ${{ matrix.arch }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install build dependencies
+        run: uv pip install --system numpy meson meson-python ninja
+
+      # Build the extension via the meson-python backend (Limited C API,
+      # abi3). --no-build-isolation reuses the numpy/meson installed above.
+      - name: Build and install the extension
+        run: uv pip install --system --no-build-isolation -e .
+
+      - name: Show environment
+        run: python -c "import sys, numpy; print('python', sys.version); print('arch', sys.maxsize > 2**32 and '64-bit' or '32-bit'); print('numpy', numpy.__version__)"
+
+      - name: Run tests
+        run: python test_datetime_metadata.py
