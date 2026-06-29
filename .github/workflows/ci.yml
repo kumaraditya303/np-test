@@ -28,6 +28,9 @@ jobs:
             os: windows-latest
             arch: x86
             msvc_arch: x86
+            # 32-bit MSVC hits an internal compiler error (C1001) building
+            # NumPy's SIMD code under the default X86_V2 baseline; disable it.
+            np_config: --config-settings=setup-args=-Dcpu-baseline=none
 
     steps:
       - uses: actions/checkout@v4
@@ -71,7 +74,7 @@ jobs:
       # Swap in NumPy from the branch under test (built from source by uv) in
       # the default shell so the MSVC toolchain is used on Windows.
       - name: Install branch NumPy
-        run: uv pip install --system "numpy @ git+https://github.com/kumaraditya303/numpy.git@datetime-metadata-limited-api"
+        run: uv pip install --system ${{ matrix.np_config }} "numpy @ git+https://github.com/kumaraditya303/numpy.git@datetime-metadata-limited-api"
 
       # Assert the .so is byte-identical (no recompile), then run the tests
       # against the branch NumPy.
