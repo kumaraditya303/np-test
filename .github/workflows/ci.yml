@@ -25,11 +25,12 @@ jobs:
             arch: x64
             msvc_arch: amd64
           - name: windows-x86
-            os: windows-latest
+            # windows-latest ships MSVC 14.51 (VS18), whose 32-bit codegen
+            # ICEs (C1001) building NumPy. Pin the older, stable MSVC 14.4x
+            # toolset by running this job on the windows-2022 image.
+            os: windows-2022
             arch: x86
             msvc_arch: x86
-            # 32-bit MSVC hits an internal compiler error (C1001) building
-            # NumPy's SIMD code under the default X86_V2 baseline; disable it.
             np_config: --config-settings=setup-args=-Dcpu-baseline=none
 
     steps:
