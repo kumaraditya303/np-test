@@ -52,18 +52,34 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v5
 
-      # Install NumPy from the datetime-metadata-limited-api branch (built from
-      # source by uv) so the extension is compiled and tested against it.
-      - name: Install build dependencies (NumPy from branch)
-        run: uv pip install --system "numpy @ git+https://github.com/kumaraditya303/numpy.git@datetime-metadata-limited-api" meson meson-python ninja
+      # Build against the released NumPy from PyPI.
+      - name: Install build dependencies (NumPy from PyPI)
+        run: uv pip install --system numpy meson meson-python ninja
 
-      # Build the extension via the meson-python backend (Limited C API,
-      # abi3). --no-build-isolation reuses the numpy/meson installed above.
-      - name: Build and install the extension
-        run: uv pip install --system --no-build-isolation -e .
+      # Build the extension (Limited C API, abi3) against the PyPI NumPy.
+      # Non-editable install so the compiled .so lands in site-packages and
+      # is NOT rebuilt when we swap NumPy underneath it below.
+      - name: Build and install the extension (against PyPI NumPy)
+        run: uv pip install --system --no-build-isolation .
 
-      - name: Show environment
-        run: python -c "import sys, numpy; print('python', sys.version); print('arch', sys.maxsize > 2**32 and '64-bit' or '32-bit'); print('numpy', numpy.__version__)"
+      # Swap in NumPy from the branch under test (built from source by uv),
+      # WITHOUT recompiling the extension, then run the tests against it.
+      # The sha256 check asserts the .so is byte-identical across the swap.
+      - name: Run tests against branch NumPy (no recompile)
+        shell: bash
+        run: |
+          hash_so() { python -c "import datetime_metadata,hashlib; print(hashlib.sha256(open(datetime_metadata.__file__,'rb').read()).hexdigest())"; }
+          before=$(hash_so)
+          echo "built against PyPI NumPy $(python -c 'import numpy;print(numpy.__version__)'); extension sha256=$before"
 
-      - name: Run tests
-        run: python test_datetime_metadata.py
+          uv pip install --system "numpy @ git+https://github.com/kumaraditya303/numpy.git@datetime-metadata-limited-api"
+
+          after=$(hash_so)
+          echo "runtime NumPy $(python -c 'import numpy;print(numpy.__version__)'); extension sha256=$after"
+          if [ "$before" != "$after" ]; then
+            echo "::error::extension was recompiled when NumPy changed ($before -> $after)"; exit 1
+          fi
+          echo "extension unchanged across NumPy swap — running tests"
+
+          python -c "import sys; print('arch', '64-bit' if sys.maxsize > 2**32 else '32-bit')"
+          python test_datetime_metadata.py
