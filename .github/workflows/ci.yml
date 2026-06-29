@@ -23,9 +23,11 @@ jobs:
           - name: windows-x64
             os: windows-latest
             arch: x64
+            msvc_arch: amd64
           - name: windows-x86
             os: windows-latest
             arch: x86
+            msvc_arch: x86
 
     steps:
       - uses: actions/checkout@v4
@@ -37,6 +39,15 @@ jobs:
         with:
           python-version: '3.12'
           architecture: ${{ matrix.arch }}
+
+      # The runners ship a stray MinGW gcc (Strawberry Perl) on PATH, which
+      # meson would otherwise pick — and on x86 it targets x86_64 and fails.
+      # Activate the MSVC toolchain of the matching bitness so meson uses cl.
+      - name: Set up MSVC
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: ${{ matrix.msvc_arch }}
 
       - name: Install uv
         uses: astral-sh/setup-uv@v5
