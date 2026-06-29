@@ -52,8 +52,10 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v5
 
-      - name: Install build dependencies
-        run: uv pip install --system numpy meson meson-python ninja
+      # Install NumPy from the datetime-metadata-limited-api branch (built from
+      # source by uv) so the extension is compiled and tested against it.
+      - name: Install build dependencies (NumPy from branch)
+        run: uv pip install --system "numpy @ git+https://github.com/kumaraditya303/numpy.git@datetime-metadata-limited-api" meson meson-python ninja
 
       # Build the extension via the meson-python backend (Limited C API,
       # abi3). --no-build-isolation reuses the numpy/meson installed above.
