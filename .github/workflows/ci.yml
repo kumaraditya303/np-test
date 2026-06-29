@@ -62,24 +62,20 @@ jobs:
       - name: Build and install the extension (against PyPI NumPy)
         run: uv pip install --system --no-build-isolation .
 
-      # Swap in NumPy from the branch under test (built from source by uv),
-      # WITHOUT recompiling the extension, then run the tests against it.
-      # The sha256 check asserts the .so is byte-identical across the swap.
-      - name: Run tests against branch NumPy (no recompile)
-        shell: bash
+      # Record the compiled .so hash before swapping NumPy. Pure python so it
+      # runs the same on bash (Linux/macOS) and pwsh (Windows); no git-bash on
+      # PATH means MSVC's link.exe stays ahead of GNU link.exe on Windows.
+      - name: Record extension hash (built against PyPI NumPy)
+        run: python -c "import datetime_metadata,hashlib,os,numpy; h=hashlib.sha256(open(datetime_metadata.__file__,'rb').read()).hexdigest(); open(os.environ['GITHUB_ENV'],'a').write('EXT_SHA_BEFORE='+h+chr(10)); print('built against PyPI NumPy '+numpy.__version__+'; ext sha256='+h)"
+
+      # Swap in NumPy from the branch under test (built from source by uv) in
+      # the default shell so the MSVC toolchain is used on Windows.
+      - name: Install branch NumPy
+        run: uv pip install --system "numpy @ git+https://github.com/kumaraditya303/numpy.git@datetime-metadata-limited-api"
+
+      # Assert the .so is byte-identical (no recompile), then run the tests
+      # against the branch NumPy.
+      - name: Verify no recompile and run tests against branch NumPy
         run: |
-          hash_so() { python -c "import datetime_metadata,hashlib; print(hashlib.sha256(open(datetime_metadata.__file__,'rb').read()).hexdigest())"; }
-          before=$(hash_so)
-          echo "built against PyPI NumPy $(python -c 'import numpy;print(numpy.__version__)'); extension sha256=$before"
-
-          uv pip install --system "numpy @ git+https://github.com/kumaraditya303/numpy.git@datetime-metadata-limited-api"
-
-          after=$(hash_so)
-          echo "runtime NumPy $(python -c 'import numpy;print(numpy.__version__)'); extension sha256=$after"
-          if [ "$before" != "$after" ]; then
-            echo "::error::extension was recompiled when NumPy changed ($before -> $after)"; exit 1
-          fi
-          echo "extension unchanged across NumPy swap — running tests"
-
-          python -c "import sys; print('arch', '64-bit' if sys.maxsize > 2**32 else '32-bit')"
+          python -c "import datetime_metadata,hashlib,os,sys,numpy; after=hashlib.sha256(open(datetime_metadata.__file__,'rb').read()).hexdigest(); before=os.environ['EXT_SHA_BEFORE']; print('runtime NumPy '+numpy.__version__+'; ext sha256='+after); sys.exit('ERROR: extension recompiled '+before+' -> '+after) if before!=after else print('extension unchanged across NumPy swap; arch '+('64-bit' if sys.maxsize>2**32 else '32-bit'))"
           python test_datetime_metadata.py
