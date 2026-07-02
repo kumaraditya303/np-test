@@ -19,10 +19,23 @@ numpy_include = run_command(
 # headers live inside the in-tree .venv, which include_directories() rejects.
 numpy_dep = declare_dependency(compile_args : ['-I' + numpy_include])
 
+# The same source builds two ways, selected by -Dlimited_api:
+#   true  (default): Limited C API / stable ABI (abi3) — one binary for 3.12+.
+#   false          : full, version-specific CPython API — used for the
+#                    free-threaded 3.14t build (abi3 is not used there).
+ext_kwargs = {
+  'dependencies' : [numpy_dep],
+  'install' : true,
+}
+if get_option('limited_api')
+  ext_kwargs += {'limited_api' : '3.12'}
+  message('Building datetime_metadata against the Limited C API (abi3)')
+else
+  message('Building datetime_metadata against the full CPython API')
+endif
+
 py.extension_module(
   'datetime_metadata',
   'src/datetime_metadata.c',
-  dependencies : [numpy_dep],
-  limited_api : '3.12',
-  install : true,
+  kwargs : ext_kwargs,
 )

@@ -32,6 +32,15 @@ jobs:
             arch: x86
             msvc_arch: x86
             np_config: --config-settings=setup-args=-Dcpu-baseline=none
+          - name: linux-freethreaded-3.14t
+            # Free-threaded 3.14t: build the FULL-API variant (no Limited API,
+            # so the module is version-specific, not abi3) and assert the GIL
+            # stays disabled with the extension loaded.
+            os: ubuntu-latest
+            arch: x64
+            python_version: '3.14t'
+            freethreaded: true
+            ext_config: --config-settings=setup-args=-Dlimited_api=false
 
     steps:
       - uses: actions/checkout@v4
@@ -41,7 +50,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: ${{ matrix.python_version || '3.12' }}
           architecture: ${{ matrix.arch }}
 
       # The runners ship a stray MinGW gcc (Strawberry Perl) on PATH, which
@@ -60,11 +69,12 @@ jobs:
       - name: Install build dependencies (NumPy from PyPI)
         run: uv pip install --system numpy meson meson-python ninja
 
-      # Build the extension (Limited C API, abi3) against the PyPI NumPy.
-      # Non-editable install so the compiled .so lands in site-packages and
-      # is NOT rebuilt when we swap NumPy underneath it below.
+      # Build the extension against the PyPI NumPy. Non-editable install so the
+      # compiled .so lands in site-packages and is NOT rebuilt when we swap
+      # NumPy underneath it below. matrix.ext_config picks the API variant
+      # (default: Limited C API / abi3; free-threaded job: full API).
       - name: Build and install the extension (against PyPI NumPy)
-        run: uv pip install --system --no-build-isolation .
+        run: uv pip install --system --no-build-isolation ${{ matrix.ext_config }} .
 
       # Record the compiled .so hash before swapping NumPy. Pure python so it
       # runs the same on bash (Linux/macOS) and pwsh (Windows); no git-bash on

@@ -9,12 +9,13 @@
  * self-test that round-trips a handful of unit strings through NumPy.
  */
 
-/* Target the 3.12 stable ABI. Must come before any CPython header.
- * Meson may also pass this via the `limited_api` kwarg, so guard it. */
-#ifndef Py_LIMITED_API
-#  define Py_LIMITED_API 0x030C0000
-#endif
-
+/*
+ * Whether this is a Limited C API (stable ABI) build is decided by the build
+ * system: the meson `limited_api` kwarg defines Py_LIMITED_API for the abi3
+ * variant. The full-API variant (e.g. free-threaded 3.14t) defines nothing,
+ * so the complete, version-specific CPython API is used. The code below only
+ * uses calls available in both, so a single source serves both variants.
+ */
 #define PY_SSIZE_T_CLEAN
 #include <Python.h>
 
@@ -197,5 +198,12 @@ PyInit_datetime_metadata(void)
         Py_DECREF(m);
         return NULL;
     }
+
+    /* On a free-threaded build (e.g. 3.14t, full API) declare that this
+     * module is safe to run with the GIL disabled — it keeps no mutable
+     * global state. Guarded so the Limited/abi3 build is unaffected. */
+#ifdef Py_GIL_DISABLED
+    PyUnstable_Module_SetGIL(m, Py_MOD_GIL_NOT_USED);
+#endif
     return m;
 }

@@ -1,0 +1,7 @@
+option(
+  'limited_api',
+  type : 'boolean',
+  value : true,
+  description : 'Build against the Limited C API (stable ABI / abi3). ' +
+                'Set false for a full-API, version-specific build (e.g. 3.14t).',
+)
