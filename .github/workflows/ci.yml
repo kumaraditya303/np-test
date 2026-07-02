@@ -88,7 +88,7 @@ jobs:
       # Swap in NumPy from the branch under test (built from source by uv) in
       # the default shell so the MSVC toolchain is used on Windows.
       - name: Install branch NumPy
-        run: uv pip install --system ${{ matrix.np_config }} "numpy @ git+https://github.com/kumaraditya303/numpy.git@datetime-metadata-limited-api"
+        run: uv pip install --system ${{ matrix.np_config }} "numpy @ git+https://github.com/kumaraditya303/numpy.git@32bit-crash"
 
       # Assert the .so is byte-identical (no recompile), then run the tests
       # against the branch NumPy.
